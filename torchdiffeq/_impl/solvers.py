@@ -5,12 +5,13 @@ from .misc import _handle_unused_kwargs
 
 
 class AdaptiveStepsizeODESolver(metaclass=abc.ABCMeta):
-    def __init__(self, dtype, y0, norm, **unused_kwargs):
+    def __init__(self, dtype, y0, norm, projection_fcn=None, **unused_kwargs):
         _handle_unused_kwargs(self, unused_kwargs)
         del unused_kwargs
 
         self.y0 = y0
         self.dtype = dtype
+        self.projection_fcn = projection_fcn
 
         self.norm = norm
 
@@ -52,7 +53,7 @@ class AdaptiveStepsizeEventODESolver(AdaptiveStepsizeODESolver, metaclass=abc.AB
 class FixedGridODESolver(metaclass=abc.ABCMeta):
     order: int
 
-    def __init__(self, func, y0, step_size=None, grid_constructor=None, interp="linear", perturb=False, **unused_kwargs):
+    def __init__(self, func, y0, step_size=None, grid_constructor=None, interp="linear", perturb=False, projection_fcn=None, **unused_kwargs):
         self.atol = unused_kwargs.pop('atol')
         unused_kwargs.pop('rtol', None)
         unused_kwargs.pop('norm', None)
@@ -66,6 +67,7 @@ class FixedGridODESolver(metaclass=abc.ABCMeta):
         self.step_size = step_size
         self.interp = interp
         self.perturb = perturb
+        self.projection_fcn = projection_fcn
 
         if step_size is None:
             if grid_constructor is None:
@@ -113,7 +115,9 @@ class FixedGridODESolver(metaclass=abc.ABCMeta):
             self.func.callback_step(t0, y0, dt)
             dy, f0 = self._step_func(self.func, t0, dt, t1, y0)
             y1 = y0 + dy
-
+            if self.projection_fcn is not None:
+                y1 = self.projection_fcn(y1)
+                
             while j < len(t) and t1 >= t[j]:
                 if self.interp == "linear":
                     solution[j] = self._linear_interp(t0, t1, y0, y1, t[j])
@@ -142,7 +146,9 @@ class FixedGridODESolver(metaclass=abc.ABCMeta):
             t1 = t0 + dt
             dy, f0 = self._step_func(self.func, t0, dt, t1, y0)
             y1 = y0 + dy
-
+            if self.projection_fcn is not None:
+                y1 = self.projection_fcn(y1)
+                
             sign1 = torch.sign(event_fn(t1, y1))
 
             if sign0 != sign1:

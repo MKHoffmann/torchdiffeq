@@ -290,6 +290,8 @@ class RKAdaptiveStepsizeODESolver(AdaptiveStepsizeEventODESolver):
         # trigger both. (i.e. interleaving them would be wrong.)
 
         y1, f1, y1_error, k = _runge_kutta_step(self.func, y0, f0, t0, dt, t1, tableau=self.tableau)
+        if self.projection_fcn is not None:
+            y1 = self.projection_fcn(y1)
         # dtypes:
         # y1.dtype == self.y0.dtype
         # f1.dtype == self.y0.dtype
